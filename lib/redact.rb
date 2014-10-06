@@ -49,9 +49,10 @@ class Redact
   ##
   ## Raises a CyclicDependencyError exception if adding these dependencies
   ## would result in a cyclic dependency.
-  def add_task what, *deps deps = deps.flatten # be nice and allow arrays to be
-    passed in raise ArgumentError, "expecting dependencies to be zero or more
-    task ids" unless deps.all? { |x| x.is_a?(Symbol) } @dag[what] = deps
+  def add_task what, *deps
+    deps = deps.flatten # be nice and allow arrays to be passed in
+    raise ArgumentError, "expecting dependencies to be zero or more task ids" unless deps.all? { |x| x.is_a?(Symbol) }
+    @dag[what] = deps
 
     @dag.strongly_connected_components.each do |x|
       raise CyclicDependencyError, "cyclic dependency #{x.inspect}" if x.size != 1
