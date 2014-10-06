@@ -15,8 +15,8 @@ runs across this graph, in such a way that all dependencies for a task are
 guaranteed to be satisfied before the task itself is executed.
 EOS
  s.homepage = "http://gitub.com/wmorgan/redact"
- s.files = %w(README COPYING lib/redact.rb bin/redact-monitor views/index.erb)
- s.executables = []
+ s.files = %w(README COPYING lib/redact.rb views/index.erb)
+ s.executables = %w(redact-monitor)
  s.rdoc_options = %w(-c utf8 --main README)
  s.licenses = "COPYING"
  s.add_runtime_dependency 'trollop', '~> 2.0'
