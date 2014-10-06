@@ -1,3 +1,6 @@
+0.1.2 / 2014-10-06:
+- mark bin/redact-monitor as an executable
+
 0.1.1 / 2014-10-06:
 - minor bugfixes
 
