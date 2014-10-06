@@ -1,0 +1,79 @@
+#!/usr/bin/env ruby
+
+require 'trollop'
+require 'redis'
+require "redact"
+require 'sinatra/base'
+require 'ostruct'
+
+class Server < Sinatra::Base
+  def initialize redact
+    @redact = redact
+    super
+  end
+
+  get '/' do
+    enqueued = @redact.enqueued_tasks.map  { |t| OpenStruct.new t }
+    in_progress = @redact.in_progress_tasks.map { |t| OpenStruct.new t }
+    done = @redact.done_tasks.map { |t| OpenStruct.new t }
+
+    (enqueued + in_progress + done).each do |x|
+      x.ago = pretty_time_diff((Time.now - x.ts).abs)
+      x.time_in_queue = x.time_waiting ? pretty_time_diff(x.time_waiting.to_i) : ""
+      x.time_in_progress = x.time_processing ? pretty_time_diff(x.time_processing.to_i) : ""
+      x.params = x.params.map { |k, v| "<b>#{k}</b>: #{v}<br/>" }.join
+      x.state_happiness = case x.state
+        when "done"; "success"
+        when "error"; "danger"
+        when "skipped"; "warning"
+        when "in_progress"; x.tries > 0 ? "warning" : ""
+      end
+
+    end
+
+    erb :index, locals: { enqueued: enqueued, in_progress: in_progress, done: done }
+  end
+
+  def pretty_time_diff diff
+    if diff < 60; sprintf("%ds", diff)
+    elsif diff < 60*60; sprintf("%dm", diff / 60)
+    elsif diff < 60*60*24; sprintf("%dh", diff / 60 / 60)
+    else sprintf("%dd", diff / 60 / 60 / 24)
+    end
+  end
+
+  get "/favicon.ico" do
+  end
+end
+Server.set :root, File.expand_path(File.join(File.dirname(__FILE__), ".."))
+
+opts, env = Trollop::options do
+  opt :host, "Server host", default: "localhost"
+  opt :port, "Server port", default: 3000
+  opt :rack_handler, "Rack handler", default: "webrick"
+  opt :redis_url, "Redis url", default: "redis://localhost:6379/"
+  opt :namespace, "Redact namespace", type: :string
+end
+
+redis = Redis.new url: opts.redis_url
+begin
+  redis.ping
+rescue Redis::CannotConnectError => e
+  Trollop::die "Can't reach redis host: #{e.message}"
+end
+
+redact = Redact.new redis, namespace: opts.namespace, blocking: false
+server = Server.new redact
+
+app = Rack::Builder.new do
+  use Rack::CommonLogger, $stdout
+  use Rack::ShowExceptions
+  use Rack::Lint
+  run server
+end.to_app
+
+handler = Rack::Handler.get opts.rack_handler.downcase
+
+## OK HERE WE GO!!!
+Signal.trap('INT') { handler.shutdown }
+handler.run app, :Port => opts.port, :Host => opts.host

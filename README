@@ -1,0 +1,94 @@
+Redact is a dependency-based work planner for Redis. It allows you to express
+your work as a set of tasks that are dependent on other tasks, and to execute
+runs across this graph, in such a way that all dependencies for a task are
+guaranteed to be satisfied before the task itself is executed.
+
+It does everything you'd expect from a production planner system:
+* You can make use of arbitrary number of worker processes.
+* You can have arbitrary concurrent runs through the task graph.
+* An application exception causes the task to be retried a fixed number of times.
+* Tasks lost as part of an application crash or Ruby segfault are recoverable.
+
+For debugging purposes, you can use Redact#enqueued_tasks, #in_progress_tasks,
+and #done_tasks to iterate over all tasks, past and present. Note that the
+output from these methods may change rapidly, and that calls are not guaranteed
+to be consisent with each other. The gem provides a simple webserver,
+redact-monitor, for visualizing the current state of the planner.
+
+== Synopsis
+
+  ############ starter.rb #############
+  r = Redis.new
+  p = Redact.new r, namespace: "food/"
+
+  ## set up tasks and dependencies
+  p.add_task :eat, :cook, :lay_table
+  p.add_task :cook, :chop
+  p.add_task :chop, :wash
+  p.add_task :wash, :buy
+  p.add_task :lay_table, :clean_table
+
+  ## publish the graph
+  p.publish_graph!
+
+  ## schedule a run
+  p.do! :eat, "dinner"
+
+  ############ worker.rb #############
+  r = Redis.new
+  p = Redact.new r, namespace: "food/"
+
+  p.each do |task, run_id|
+    puts "#{task} #{run_id}"
+    sleep 1 # do work
+  end
+
+This prints something like:
+
+buy dinner
+wash dinner
+chop dinner
+cook dinner
+clean_table dinner
+lay_table dinner
+eat dinner
+
+You can run multiple copies of worker.rb concurrently to see parallel magic.
+
+== Using Redact
+
+First, some terminology: each node in the graph is a "task". Task depends on
+other tasks. To perform work, you select one of these tasks to be executed;
+this is the "target". An execution of a "target" across the graph is a "run";
+each run has a unique run_id, which you supply. In terms of Ruby objects,
+run_ids are represented as strings, and tasks are always represented as
+symbols.
+
+Adding circular dependencies will result in an error. Specifying a
+previous-used run_id will do something undefined. Otherwise, workers will
+receive tasks in dependency order, and only those tasks which are necessary for
+the execution of a target will be executed.
+
+A run may have key/value parameters. These parameters are supplied to every
+task that is executed as part of that run. These parameters may not be modified
+as part of the run.
+
+You may only have one graph per namespace. However, this graph may have an
+arbitrary number of tasks, and any task may be used as a target.
+
+You must publish the graph (with #publish_graph!) before workers can receive
+it. Worker processes reload the graph before processing every task, so updating
+the graph without restarting worker processes is acceptable. (Of course,
+workers must know how to execute any new tasks you add.)
+
+== Error recovery
+
+Workers that crash due to non-application exceptions (Ruby crashes, bugs in Redact)
+will leave their tasks in the "in processing" queue. You can use
+Redact#in_progress_tasks to iterate over these items; excessively old items are
+probably the result of a process crash.
+
+== Bug reports
+
+Please file bugs here: https://github.com/wmorgan/redact/issues
+Please send comments to: wmorgan-redact-readme@masanjin.net.
