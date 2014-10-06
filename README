@@ -3,17 +3,19 @@ your work as a set of tasks that are dependent on other tasks, and to execute
 runs across this graph, in such a way that all dependencies for a task are
 guaranteed to be satisfied before the task itself is executed.
 
-It does everything you'd expect from a production planner system:
-* You can make use of arbitrary number of worker processes.
-* You can have arbitrary concurrent runs through the task graph.
+It does everything you'd expect from a production system:
+* You can have an arbitrary number of worker processes.
+* You can have an arbitrary number of concurrent runs through the task graph.
 * An application exception causes the task to be retried a fixed number of times.
 * Tasks lost as part of an application crash or Ruby segfault are recoverable.
 
 For debugging purposes, you can use Redact#enqueued_tasks, #in_progress_tasks,
 and #done_tasks to iterate over all tasks, past and present. Note that the
 output from these methods may change rapidly, and that calls are not guaranteed
-to be consisent with each other. The gem provides a simple webserver,
-redact-monitor, for visualizing the current state of the planner.
+to be consisent with each other.
+
+The gem provides a simple web server (bin/redact-monitor) for visualizing the
+current state of the planner and worker processes.
 
 == Synopsis
 
