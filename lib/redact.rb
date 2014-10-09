@@ -171,18 +171,22 @@ class Redact
   ##
   ## +opts+ are:
   ## * +blocking+: if true, #each will block until items are available (and will never return)
+  ## * +block_timeout+: when +blocking+ is true, the timeout (in seconds) before stopping. A value of nil or 0 will block forever.
   ## * +retries+: how many times an individual job should be retried before resulting in an error state. Default is 2 (so 3 tries total).
   ## * +worker_id+: the id of this worker process, for debugging. (If nil, will use a reasonably intelligent default.)
   def each opts={}
     worker_id = opts[:worker_id] || [Socket.gethostname, $$, $0].join("-")
     retries = opts[:retries] || 2
     blocking = opts[:blocking]
+    block_timeout = opts[:block_timeout] || 0
 
     while true
-      ## get the token of the next task to perform
-      meth = blocking ? :brpoplpush : :rpoplpush
-      token = @redis.send meth, @queue, @processing_list
-      break unless token # no more tokens and we're in non-blocking mode
+      token = if blocking
+        @redis.brpoplpush @queue, @processing_list, block_timeout
+      else
+        @redis.rpoplpush @queue, @processing_list
+      end
+      break unless token # no more tokens!
 
       ## decompose the token
       task, target, run_id, insertion_time = parse_token token
