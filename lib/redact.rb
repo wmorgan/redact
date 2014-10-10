@@ -33,11 +33,28 @@ class Redact
     @params_key = [@namespace, "params"].join
   end
 
+  attr_reader :dag
+
   ## Drop all data and reset the planner.
   def reset!
     keys = [@queue, @processing_list, @done_list, @dag_key, @params_key]
     keys += @redis.keys("#@metadata_prefix/*")
     keys.each { |k| @redis.del k }
+  end
+
+  def visualize stream=$stdout
+    sorted = @dag.tsort
+    leaves = sorted.select { |k| @dag[k].nil? || @dag[k].empty? }
+
+    pos = {}
+    curpos = 0
+    leaves.each do |l|
+      string = " #{l} "
+      pos[l] = curpos
+      stream.print string
+      curpos += string.length
+    end
+    stream.puts
   end
 
   class CyclicDependencyError < StandardError; end
@@ -117,6 +134,7 @@ class Redact
   def enqueued_tasks start_idx=0, end_idx=-1
     @redis.lrange(@queue, start_idx, end_idx).map { |t| task_summary_for t }
   end
+  def num_enqueued_tasks; @redis.llen @queue end
 
   ## Returns information representing the set of tasks currently in process by
   ## worker processes. The return value is a hash that includes keys from
@@ -127,6 +145,7 @@ class Redact
   def in_progress_tasks start_idx=0, end_idx=-1
     @redis.lrange(@processing_list, start_idx, end_idx).map { |t| task_summary_for t }
   end
+  def num_in_progress_tasks; @redis.llen @processing_list end
 
   ## Returns information representing the set of tasks that have been
   ## completed. The return value is a hash that includes keys from
@@ -140,6 +159,7 @@ class Redact
   def done_tasks start_idx=0, end_idx=-1
     @redis.lrange(@done_list, start_idx, end_idx).map { |t| task_summary_for t }
   end
+  def num_done_tasks; @redis.llen @done_list end
 
   ## Yields tasks from the queue that are ready for execution. Callers should
   ## then perform the work for those tasks. Any exceptions thrown will result in the

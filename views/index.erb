@@ -7,7 +7,7 @@
 </head>
 
 <body>
-  <h1>In Progress (<%= in_progress.size %>)</h1>
+  <h1>In Progress (<%= num_in_progress %>)</h1>
 
   <div class="table-responsive">
   <table class="table table-striped table-hover table-condensed">
@@ -36,7 +36,7 @@
   </table>
   </div>
 
-  <h1>Enqueued (<%= enqueued.size %>)</h1>
+  <h1>Enqueued (<%= num_enqueued %>)</h1>
 
   <div class="table-responsive">
   <table class="table table-striped table-hover table-condensed">
@@ -65,7 +65,7 @@
   </table>
   </div>
   
-  <h1>Recently completed (<%= done.size %>)</h1>
+  <h1>Recently completed (<%= num_done %>)</h1>
 
   <div class="table-responsive">
   <table class="table table-striped table-hover table-condensed">
@@ -83,7 +83,15 @@
     <tbody>
       <% done.each do |t| %>
         <tr class="<%= t.state_happiness %>">
-          <td><%= t.task %><br/><%= t.target %><br/><%= t.worker_id %></td>
+          <td>
+            <%= t.task %><br/>
+            <%= t.target %><br/>
+            <%= t.worker_id %><br/>
+            <% if t.error? %>
+              <b><%= t.error %></b><br/>
+              <%= t.backtrace_html %>
+            <% end %>
+          </td>
           <td><%= t.run_id %></td>
           <td><%= t.ago %></td>
           <td><%= t.state %></td>
@@ -91,6 +99,7 @@
           <td><%= t.time_in_progress %></td>
           <td><%= t.params %></td>
         </tr>
+
       <% end %>
     </tbody>
   </table>
